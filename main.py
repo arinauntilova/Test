@@ -9,6 +9,10 @@ import re
 FILE_EXTENSION = ".stdout"
 WORD = "error"
 STRING_BEGIN = 'Solver finished at'
+MEMORY_CRITERION = 0.5
+TOTAL_CRITERION = 0.1
+
+os.chdir('task1\logs')
 
 # Проверить, что папки ft_run и ft_reference существуют.
 def check_existence_dirs(file):
@@ -20,7 +24,6 @@ def check_existence_dirs(file):
         file.write("directory missing: ft_reference \n")
         flag = False
     return flag
-    
 
 def check_set_of_files(dir_name):
     found_files = []
@@ -57,7 +60,6 @@ def check_entry_word(dir_name, file_res):
                 if WORD in line.lower():                                                               
                     file_res.write(name.replace(dir_name + '\\', '') + f'({str(cnt)}): ' + line)
 
-
  # Проверить, что в файле есть строка, начинающаяся с определенной фразы
 def check_string_start(dir_name, file_res):
     for name in sorted(glob.glob(dir_name + "\**\*" + FILE_EXTENSION, recursive = True)):
@@ -71,8 +73,7 @@ def check_string_start(dir_name, file_res):
             if flag == False:
                 file_res.write(name.replace(dir_name + '\\', '') + ': missing ' + f"'{STRING_BEGIN}' \n")
 
-
-def find_max_value(dir_name):
+def find_max_memory_value(dir_name):
     max_vals = {}
     for name in sorted(glob.glob(dir_name + "\**\*" + FILE_EXTENSION, recursive = True)):
         with open(name) as file:
@@ -82,21 +83,32 @@ def find_max_value(dir_name):
                     val = re.findall('Memory Working Set Peak = (\d*\.\d+|\d+)', line)
                     if float(val[0]) > max_val:
                         max_val = float(val[0])
-            max_vals[name.replace(dir_name + '\\', '')] =  max_val
+            max_vals[name.replace(dir_name + '\\', '')] = max_val
     return max_vals
 
-def check_max_val(file):
-    vals_run = find_max_value("ft_run")
-    vals_ref = find_max_value("ft_reference")
+def find_total_value(dir_name):
+    total_vals = {}
+    for name in sorted(glob.glob(dir_name + "\**\*" + FILE_EXTENSION, recursive = True)):
+        with open(name) as file:
+            for line in file:
+                if "MESH::Bricks: Total=" in line and " Gas=" in line and \
+                            "Solid=" in line and "Partial=" in line:
+                    val = re.findall('Total=(\d+)', line)
+                    total_val = int(val[0])
+            total_vals[name.replace(dir_name + '\\', '')] = total_val
+    return total_vals
+
+def check_values(file, find_func, crit, attribute):
+    vals_run = find_func("ft_run")
+    vals_ref = find_func("ft_reference")
     for key in vals_run.keys():
         val_run = vals_run.get(key)
         val_ref = vals_ref.get(key)
         diff = abs(val_run - val_ref) / min(val_ref, val_run)
-        if diff > 0.5:
+        if diff > crit:
             print(diff)
-            file.write(key + f" different 'Memory Working Set Peak' (ft_run={val_run}, \
-                          ft_reference={val_ref}, rel.diff={round(diff, 2)}, criterion=0.5) \n")
-
+            file.write(key + f" different '{attribute}' (ft_run={val_run}," +
+                         f" ft_reference={val_ref}, rel.diff={round(diff, 2)}, criterion={crit}) \n")
 
 def check_test_dir(test):
     os.chdir(test)
@@ -116,8 +128,11 @@ def check_test_dir(test):
 
     #  Проверить, что max число Memory Working Set Peak из всего лога отличается не более чем на 50% 
     # (по отношению значения из ft_run к значению из ft_reference)
-    check_max_val(file)
-
+    check_values(file, find_max_memory_value, MEMORY_CRITERION, "Memory Working Set Peak")
+    
+    #  Проверить, что последнее значение Total из всего лога отличается не более чем на 10% 
+    # (по отношению значения из ft_run к значению из ft_reference)
+    check_values(file, find_total_value, TOTAL_CRITERION, "Total")
 
     file.close()
 
