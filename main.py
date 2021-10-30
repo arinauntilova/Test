@@ -52,6 +52,7 @@ def check_extra_miss_files(file):
 
  # Проверить, что в файле нет определенного слова
 def check_entry_word(dir_name, file_res):
+    flag = True
     for name in sorted(glob.glob(dir_name + "\**\*" + FILE_EXTENSION, recursive = True)):
         with open(name) as file:
             cnt = 0
@@ -59,6 +60,9 @@ def check_entry_word(dir_name, file_res):
                 cnt += 1
                 if WORD in line.lower():                                                               
                     file_res.write(name.replace(dir_name + '\\', '') + f'({str(cnt)}): ' + line)
+                    flag = False
+    return flag
+
 
  # Проверить, что в файле есть строка, начинающаяся с определенной фразы
 def check_string_start(dir_name, file_res):
@@ -69,9 +73,9 @@ def check_string_start(dir_name, file_res):
                 if line.startswith(STRING_BEGIN):
                     flag = True
                     break
-
             if flag == False:
                 file_res.write(name.replace(dir_name + '\\', '') + ': missing ' + f"'{STRING_BEGIN}' \n")
+    return flag
 
 def find_max_memory_value(dir_name):
     max_vals = {}
@@ -99,6 +103,7 @@ def find_total_value(dir_name):
     return total_vals
 
 def check_values(file, find_func, crit, attribute):
+    flag = True
     vals_run = find_func("ft_run")
     vals_ref = find_func("ft_reference")
     for key in vals_run.keys():
@@ -106,50 +111,62 @@ def check_values(file, find_func, crit, attribute):
         val_ref = vals_ref.get(key)
         diff = abs(val_run - val_ref) / min(val_ref, val_run)
         if diff > crit:
-            print(diff)
+            # print(diff)
             file.write(key + f" different '{attribute}' (ft_run={val_run}," +
                          f" ft_reference={val_ref}, rel.diff={round(diff, 2)}, criterion={crit}) \n")
+            flag = False
+    return flag
+            
 
-def check_test_dir(test):
-    os.chdir(test)
-    file = open('report.txt', 'w');
+def check_test_dir(file):
+    flag = True
+
     # Проверить, что папки ft_run и ft_reference существуют
     if not check_existence_dirs(file):
-        return
+        return False
 
     # Проверить, что в папках ft_run и ft_reference совпадает набор файлов "*.stdout"
     if not check_extra_miss_files(file):
-        return
+        return False
 
     # Проверить, что в файле нет слова ERROR
-    check_entry_word("ft_run", file)
+    flag &= check_entry_word("ft_run", file)
+
     # Проверить, что в файле есть строка, начинающаяся с 'Solver finished at'
-    check_string_start("ft_run", file)
+    flag &= check_string_start("ft_run", file)
 
     #  Проверить, что max число Memory Working Set Peak из всего лога отличается не более чем на 50% 
     # (по отношению значения из ft_run к значению из ft_reference)
-    check_values(file, find_max_memory_value, MEMORY_CRITERION, "Memory Working Set Peak")
+    flag &= check_values(file, find_max_memory_value, MEMORY_CRITERION, "Memory Working Set Peak")
     
     #  Проверить, что последнее значение Total из всего лога отличается не более чем на 10% 
     # (по отношению значения из ft_run к значению из ft_reference)
-    check_values(file, find_total_value, TOTAL_CRITERION, "Total")
+    flag &= check_values(file, find_total_value, TOTAL_CRITERION, "Total")
 
-    file.close()
+    return flag
 
 def get_all_dirs(dirs):
+    filename = 'report.txt'
     for dir in dirs:     
         os.chdir(dir)
         dir_test_results = os.listdir(".")
         for test in dir_test_results:
-            check_test_dir(test)
+            os.chdir(test)
+            file = open(filename, 'w');
+            flag = check_test_dir(test, file)
+            file.close()
+            if flag:
+                print("OK: " + os.getcwd())
+            else:
+                print("FAIL: " + os.getcwd())
+                with open(filename) as file:
+                    print(file.read())
+           
             os.chdir('../')
         os.chdir('../')
 
 # папки из папки logs
 # получение списка папок в каталоге
-dir_tasks = os.listdir()  # extend
-print(dir_tasks)
-
-print(dir_tasks)
+dir_tasks = os.listdir() 
 
 get_all_dirs(dir_tasks)
