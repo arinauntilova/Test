@@ -1,0 +1,1 @@
+In ft_run there are missing files present in ft_reference: 5\5.stdout, 3\3.stdoutIn ft_run there are extra files not present in ft_reference: 2\2.stdout, 4\4.stdout
